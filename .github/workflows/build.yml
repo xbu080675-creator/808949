@@ -24,8 +24,8 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('plugin/manifest.json','utf8'))"
           mkdir -p dist
           cd plugin
-          zip -r ../dist/Tavo-Multimodal-v0.0.20.tpg manifest.json entry.js processor.js video-panel.html
+          zip -r ../dist/Tavo-Multimodal-v0.0.21.tpg manifest.json entry.js processor.js video-panel.html
       - uses: actions/upload-artifact@v4
         with:
-          name: Tavo-Multimodal-v0.0.20
+          name: Tavo-Multimodal-v0.0.21
           path: dist/*.tpg
