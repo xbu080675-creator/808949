@@ -33,7 +33,7 @@ tavo.plugin.onInputAction('media',run(async()=>{
  }finally{await tavo.file.delete(f.path);}
 }));
 tavo.plugin.onInputAction('network',run(async()=>{
- const lines=['Tavo Multimodal 0.0.4'];
+ const lines=['Tavo Multimodal 0.0.5'];
  let stage='读取配置';
  try{
  const raw=String(tavo.plugin.config.get('endpoint')||'').trim();
@@ -56,7 +56,7 @@ tavo.plugin.onInputAction('network',run(async()=>{
  await report('network',lines);
 }));
 tavo.plugin.onInputAction('native',run(async()=>{
- const lines=['Tavo Multimodal 0.0.4','原生文件下载：固定公开测试地址，不携带密钥'];
+ const lines=['Tavo Multimodal 0.0.5','原生文件下载：固定公开测试地址，不携带密钥'];
  let path;
  try{
  path=await tavo.file.save('tavo-mm-network-probe-'+Date.now()+'.txt','https://example.com/',{scope:'chat'});
@@ -71,7 +71,7 @@ const promptText='Reply with exactly OK.';
 const modelTest=(id,fn)=>tavo.plugin.onInputAction(id,run(async()=>{
  if(busy){await toast('已有模型测试运行中');return;}
  busy=true;
- const lines=['Tavo Multimodal 0.0.4'];
+ const lines=['Tavo Multimodal 0.0.5'];
  try{await toast('正在测试，可能产生少量 API 费用');await fn(lines);}
  catch(e){lines.push('失败：'+errorText(e));}
  finally{busy=false;}
@@ -128,4 +128,42 @@ tavo.plugin.onInputAction('decisionReport',run(async()=>{
  if(!d){await toast('暂无决策');return;}
  await tavo.utils.export('tavo-media-decision.txt',JSON.stringify(d,null,2));
 }));
+
+const mediaRun=fn=>run(async()=>{if(busy){await toast('已有任务运行中');return;}busy=true;try{await fn();}finally{busy=false;}});
+const askText=async(question,defaultValue)=>await tavo.utils.ask({question,defaultValue});
+const confirmMedia=async()=> (await tavo.utils.ask({question:'确认执行媒体生成？可能产生费用。',options:['确认','取消'],allowOther:false,defaultValue:'取消'}))==='确认';
+const active=async id=>{const c=await tavo.chat.current();if(!c||c.id!==id)throw new Error('会话已切换');return c;};
+async function outputMedia(type,text,chat){
+ if(typeof text!=='string'||!text.trim())throw new Error('内容为空');
+ text=text.trim().slice(0,1000);
+ if(!await confirmMedia())return;
+ await active(chat.id);
+ if(type==='image'){
+  const path=await tavo.image.generate(text,{saveAs:'mm-'+Date.now()+'.png',scope:'chat'});
+  await active(chat.id);
+  if(typeof path!=='string'||!path.startsWith('files/'))throw new Error('生图未返回有效路径');
+  await tavo.variable.set(key+'.lastImage',path,'chat');
+  await tavo.utils.preview(path);
+ }else if(type==='voice'){
+  const rows=await tavo.message.find(-1,{role:'assistant'});
+  const ids=chat.characters.map(c=>c.id);
+  let id=rows[0]&&rows[0].characterId;
+  if(!ids.includes(id)){if(ids.length!==1)throw new Error('无法确定说话角色');id=ids[0];}
+  const ok=await tavo.tts.play(text,{voice:{character:id},queue:false,applyPlaybackRules:false});
+  await toast(ok?'语音开始播放':'语音未播放，请检查角色音色绑定');
+ }
+}
+for(const type of ['image','voice'])tavo.plugin.onInputAction('manual_'+type,mediaRun(async()=>{
+ const chat=await tavo.chat.current();if(!chat)throw new Error('无活动聊天');
+ const text=await askText(type==='image'?'输入图片描述':'输入角色朗读文本','');
+ if(typeof text==='string'&&text.trim())await outputMedia(type,text,chat);
+}));
+tavo.plugin.onInputAction('execute',mediaRun(async()=>{
+ const chat=await tavo.chat.current();if(!chat)throw new Error('无活动聊天');
+ const d=await tavo.variable.get(decisionKey,'chat');
+ if(!d||!['image','voice'].includes(d.type)){await toast('当前没有可执行的图片或语音决策');return;}
+ const text=await askText(d.type==='image'?'检查图片描述':'编辑实际朗读文本（不是语音描述）',d.type==='image'?d.prompt:'');
+ if(typeof text==='string'&&text.trim())await outputMedia(d.type,text,chat);
+}));
+tavo.plugin.onInputAction('lastImage',run(async()=>{const p=await tavo.variable.get(key+'.lastImage','chat');if(p)await tavo.utils.preview(p);else await toast('暂无生成图片');}));
 })();
