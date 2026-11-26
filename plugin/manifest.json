@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "author": "Tavo Multimodal",
   "description": "多模态技术验证：手动检查宿主接口、配置、变量存储及媒体文件读取，不自动发送聊天内容。",
   "localization": {
@@ -13,7 +13,9 @@
     "message",
     "variable",
     "file",
-    "network"
+    "network",
+    "generate",
+    "tts"
   ],
   "contributes": {
     "inputActions": [
@@ -92,6 +94,10 @@
       {
         "id": "imageDecisionDirect",
         "label": "直接执行图片决策（可能计费）"
+      },
+      {
+        "id": "forcePlan",
+        "label": "强制图片规划（可能计费）"
       }
     ],
     "settings": {
@@ -128,6 +134,30 @@
               "label": "Anthropic"
             }
           ]
+        },
+        {
+          "key": "autoVoice",
+          "type": "switch",
+          "label": "自动角色语音（可能计费）",
+          "default": false
+        },
+        {
+          "key": "smartVoice",
+          "type": "switch",
+          "label": "仅在智能决策推荐语音时朗读",
+          "default": false
+        },
+        {
+          "key": "autoAnalyze",
+          "type": "switch",
+          "label": "自动智能分析（发送近期聊天，可能计费）",
+          "default": false
+        },
+        {
+          "key": "autoImage",
+          "type": "switch",
+          "label": "自动分析并生图（可能计费）",
+          "default": false
         }
       ]
     }
