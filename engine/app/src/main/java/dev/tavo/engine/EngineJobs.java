@@ -54,9 +54,8 @@ final class EngineJobs {
     static synchronized Map<String,Object> snapshot(){
         long done=number(job,"done"),total=number(job,"total"),ms=elapsed();
         boolean complete="done".equals(job.get("phase"));
-        long pct=total>0?Math.max(0,Math.min(100,100*done/total)):0;
-        Long eta=null;long current=done-sessionDone,spent=active?SystemClock.elapsedRealtime()-sessionStart:0;
-        if(active&&current>=2&&total>done&&spent>0)eta=Math.min(86400L,(spent/current*(total-done)+999)/1000);
+        long pct=Timeline.progress(done,total);
+        Long eta=active?Timeline.eta(done,total,sessionDone,SystemClock.elapsedRealtime()-sessionStart):null;
         return McpServer.obj("jobId",job.get("id"),"phase",job.get("phase"),"taskState",job.get("stage"),"progressPercent",pct,"completedUnits",done,"totalUnits",total,"elapsedSeconds",ms/1000,"etaSeconds",eta,"cancelAuthorized",remoteAllowed,"completed",complete,"canResume",!active&&job.get("uri")!=null&&!complete);
     }
     static synchronized File preview(){return new File(dir,"preview.jpg");}
