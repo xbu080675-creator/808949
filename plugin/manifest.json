@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "author": "Tavo Multimodal",
   "description": "多模态决策、语音和生图联动；默认媒体调试模式，不调用生图或 TTS。",
   "localization": {
@@ -114,13 +114,37 @@
       {
         "id": "hookProbe",
         "label": "检查事件注册（不调用 API）"
+      },
+      {
+        "id": "visualEdit",
+        "label": "编辑角色视觉档案"
+      },
+      {
+        "id": "visualExport",
+        "label": "导出角色视觉档案"
+      },
+      {
+        "id": "visualClear",
+        "label": "清空角色视觉档案"
+      },
+      {
+        "id": "frequencyReport",
+        "label": "导出频率与额度记录"
+      },
+      {
+        "id": "importMediaProbe",
+        "label": "本地多模态文件测试（不上传）"
+      },
+      {
+        "id": "insertImage",
+        "label": "插入最近图片到聊天"
       }
     ],
     "settings": {
       "schema": [
         {
           "type": "info",
-          "text": "默认媒体调试拦截插件生图和 TTS；分析及规划会将近期消息和当前角色描述发送至当前文本模型，可能计费。事件日志仅记录结构和状态。",
+          "text": "默认媒体调试拦截插件生图和 TTS。文本规划仍可能计费，使用近期消息、角色描述和自建视觉档案。自动请求限额按聊天及UTC日期计算，手动请求不计入。",
           "icon": "info"
         },
         {
@@ -180,6 +204,90 @@
           "type": "switch",
           "label": "零媒体费用调试模式",
           "default": true
+        },
+        {
+          "key": "planInterval",
+          "type": "select",
+          "label": "自动分析间隔",
+          "default": "3",
+          "options": [
+            {
+              "value": "1",
+              "label": "每 1 条角色回复"
+            },
+            {
+              "value": "2",
+              "label": "每 2 条角色回复"
+            },
+            {
+              "value": "3",
+              "label": "每 3 条角色回复"
+            },
+            {
+              "value": "5",
+              "label": "每 5 条角色回复"
+            },
+            {
+              "value": "10",
+              "label": "每 10 条角色回复"
+            }
+          ]
+        },
+        {
+          "key": "voiceInterval",
+          "type": "select",
+          "label": "自动语音间隔",
+          "default": "2",
+          "options": [
+            {
+              "value": "1",
+              "label": "每 1 条角色回复"
+            },
+            {
+              "value": "2",
+              "label": "每 2 条角色回复"
+            },
+            {
+              "value": "3",
+              "label": "每 3 条角色回复"
+            },
+            {
+              "value": "5",
+              "label": "每 5 条角色回复"
+            },
+            {
+              "value": "10",
+              "label": "每 10 条角色回复"
+            }
+          ]
+        },
+        {
+          "key": "imageInterval",
+          "type": "select",
+          "label": "自动生图间隔",
+          "default": "5",
+          "options": [
+            {
+              "value": "1",
+              "label": "每 1 条角色回复"
+            },
+            {
+              "value": "2",
+              "label": "每 2 条角色回复"
+            },
+            {
+              "value": "3",
+              "label": "每 3 条角色回复"
+            },
+            {
+              "value": "5",
+              "label": "每 5 条角色回复"
+            },
+            {
+              "value": "10",
+              "label": "每 10 条角色回复"
+            }
+          ]
         }
       ]
     }
