@@ -96,5 +96,5 @@ modelTest('post',async lines=>{
  const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body),credentials:'omit',redirect:'error',...(c?{signal:c.signal}:{})});
  lines.push('独立 POST HTTP '+r.status+'；无认证，仅测试传输');
  }finally{if(timer!==null)clearTimeout(timer);}
-}));
+});
 })();
