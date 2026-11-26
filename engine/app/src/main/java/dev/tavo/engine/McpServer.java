@@ -11,12 +11,15 @@ import java.util.function.Supplier;
 /** Small, stateless MCP 2025-03-26 / 2025-06-18 JSON transport. */
 public final class McpServer implements AutoCloseable {
     private final String token;
-    private final Supplier<Map<String,Object>> status, result;
+    private final Supplier<Map<String,Object>> status, result, taskStatus, cancel;
     private final ServerSocket server;
     private final ThreadPoolExecutor pool = new ThreadPoolExecutor(2,4,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(8));
     private final Set<Socket> clients=ConcurrentHashMap.newKeySet();
     public McpServer(int port,String token,Supplier<Map<String,Object>> status,Supplier<Map<String,Object>> result) throws IOException {
-        this.token=Objects.requireNonNull(token);this.status=status;this.result=result;
+        this(port,token,status,result,()->obj("phase","unavailable"),()->obj("cancelRequested",false));
+    }
+    public McpServer(int port,String token,Supplier<Map<String,Object>> status,Supplier<Map<String,Object>> result,Supplier<Map<String,Object>> taskStatus,Supplier<Map<String,Object>> cancel) throws IOException {
+        this.token=Objects.requireNonNull(token);this.status=status;this.result=result;this.taskStatus=taskStatus;this.cancel=cancel;
         if(token.length()<32)throw new IllegalArgumentException("short token");
         server=new ServerSocket();server.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port),8);
         Thread t=new Thread(()->{while(!server.isClosed())try{Socket s=server.accept();clients.add(s);try{pool.execute(()->serve(s));}catch(RejectedExecutionException e){clients.remove(s);s.close();}}catch(IOException ignored){}},"MCP accept");t.setDaemon(true);t.start();
@@ -48,9 +51,9 @@ public final class McpServer implements AutoCloseable {
         Object raw;try{raw=new Parser(new String(body,StandardCharsets.UTF_8)).parse();}catch(RuntimeException e){reply(out,400,error(null,-32700,"Parse error"));return;}
         if(!(raw instanceof Map)){reply(out,400,error(null,-32600,"Invalid request"));return;}Map<?,?> r=(Map<?,?>)raw;Object id=r.get("id"),method=r.get("method");if(!"2.0".equals(r.get("jsonrpc"))||!(method instanceof String)||!(id==null||id instanceof Number||id instanceof String)){reply(out,400,error(null,-32600,"Invalid request"));return;}
         Map<?,?> params=r.get("params") instanceof Map?(Map<?,?>)r.get("params"):Collections.emptyMap();if(!r.containsKey("id")){reply(out,202,null);return;}
-        Object value;switch((String)method){case "initialize":Object ver=params.get("protocolVersion");value=obj("protocolVersion","2025-03-26".equals(ver)?ver:"2025-06-18","capabilities",obj("tools",obj()),"serverInfo",obj("name","tavo-multimodal-engine","version","0.1.0"));break;case "ping":value=obj();break;
-        case "tools/list":value=obj("tools",Arrays.asList(tool("engine_status","Local engine connectivity and readiness; no inference in v0.1.0."),tool("get_media_result","Latest explicitly shared local media metadata only; not vision or transcription.")));break;
-        case "tools/call":Object args=params.get("arguments");if(args!=null&&(!(args instanceof Map)||!((Map<?,?>)args).isEmpty())){reply(out,200,error(id,-32602,"No arguments accepted"));return;}Map<String,Object> v;if("engine_status".equals(params.get("name")))v=status.get();else if("get_media_result".equals(params.get("name")))v=result.get();else{reply(out,200,error(id,-32602,"Unknown tool"));return;}value=obj("content",Collections.singletonList(obj("type","text","text",json(v))),"isError",false);break;
+        Object value;switch((String)method){case "initialize":Object ver=params.get("protocolVersion");value=obj("protocolVersion","2025-03-26".equals(ver)?ver:"2025-06-18","capabilities",obj("tools",obj()),"serverInfo",obj("name","tavo-multimodal-engine","version","0.2.0"));break;case "ping":value=obj();break;
+        case "tools/list":value=obj("tools",Arrays.asList(tool("engine_status","Local engine connectivity and model readiness; labels and Whisper are experimental."),tool("get_media_result","Latest explicitly shared local analysis or metadata; labels are approximate."),tool("get_task_status","Read local task progress without accessing private files."),tool("cancel_task","Request cancellation of the current task only if authorized in the engine UI.")));break;
+        case "tools/call":Object args=params.get("arguments");if(args!=null&&(!(args instanceof Map)||!((Map<?,?>)args).isEmpty())){reply(out,200,error(id,-32602,"No arguments accepted"));return;}Map<String,Object> v;if("engine_status".equals(params.get("name")))v=status.get();else if("get_media_result".equals(params.get("name")))v=result.get();else if("get_task_status".equals(params.get("name")))v=taskStatus.get();else if("cancel_task".equals(params.get("name")))v=cancel.get();else{reply(out,200,error(id,-32602,"Unknown tool"));return;}value=obj("content",Collections.singletonList(obj("type","text","text",json(v))),"isError",false);break;
         default:reply(out,200,error(id,-32601,"Method not found"));return;}reply(out,200,ok(id,value));
     }catch(Exception ignored){}finally{clients.remove(socket);}}
 }
