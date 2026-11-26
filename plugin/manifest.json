@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "author": "Tavo Multimodal",
   "description": "原生媒体能力优先：智能调度、角色视觉档案、频率及费用保护。",
   "localization": {
@@ -56,7 +56,7 @@
       "schema": [
         {
           "type": "info",
-          "text": "图片识别使用Tavo原生图片发送。调试模式仅拦截插件生图和TTS，文本分析可能计费。插件自动语音开启时建议关闭Tavo自带自动播放。 音视频元数据接入默认关闭；开启后匹配附件由插件转为元数据文本，可能随聊天发送至模型。",
+          "text": "图片识别使用Tavo原生图片发送。调试模式仅拦截插件生图和TTS，文本分析可能计费。插件自动语音开启时建议关闭Tavo自带自动播放。 音视频元数据接入默认关闭；开启后匹配附件由插件转为元数据文本，可能随聊天发送至模型。 大视频默认完整读取50MB，可选100MB（实验）；超出读取上限至200MB只返回基本文件信息。音频50MB，图片20MB。",
           "icon": "info"
         },
         {
@@ -218,6 +218,22 @@
           "type": "switch",
           "label": "本地音视频元数据接入（实验，非内容理解）",
           "default": false
+        },
+        {
+          "key": "videoReadLimit",
+          "type": "select",
+          "label": "视频完整读取上限（大文件可能占用内存）",
+          "default": "50",
+          "options": [
+            {
+              "value": "50",
+              "label": "50MB（推荐）"
+            },
+            {
+              "value": "100",
+              "label": "100MB（实验）"
+            }
+          ]
         }
       ]
     },
