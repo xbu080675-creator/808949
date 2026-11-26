@@ -26,14 +26,6 @@ final class MediaPipeline {
     static int difference(int[] a,int[] b){int d=0;for(int i=0;i<64;i++)d+=Math.abs(a[i]-b[i]);return d/64;}
     interface Checkpoint {void save(Map<String,Object> media,int done,int total,String stage)throws Exception;}
     static long num(Map<String,Object> m,String k){Object x=m.get(k);return x instanceof Number?((Number)x).longValue():0;}
-    static int videoCount(long ms){return (int)Math.max(1,Math.min(96,(ms+4999)/5000));}
-    static int audioCount(long ms){return (int)((ms+29999)/30000);}
-    static long sample(long ms,int i,int count){return (long)((i+.5)*ms/count);}
-    static String offsetTranscript(String text,long startMs){
-        StringBuilder out=new StringBuilder();java.util.regex.Pattern pattern=java.util.regex.Pattern.compile("^\\[(\\d+(?:\\.\\d+)?)s\\](.*)$");
-        for(String line:text.split("\\n")){java.util.regex.Matcher a=pattern.matcher(line);if(a.matches())out.append('[').append(String.format(Locale.ROOT,"%.3f",startMs/1000.0+Double.parseDouble(a.group(1)))).append("s]").append(a.group(2)).append('\n');}
-        return out.toString();
-    }
     @SuppressWarnings("unchecked")
     static synchronized Map<String,Object> analyze(Context c,Uri uri,File dir,Map<String,Object> previous,ModelStore.Model model,Checkpoint cp)throws Exception{
         Map<String,Object> m=new LinkedHashMap<>(previous);
@@ -44,13 +36,13 @@ final class MediaPipeline {
         try{
             mm.setDataSource(c,uri);
             ms=Long.parseLong(mm.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
-            if(ms<=0||ms>7200000)throw new IOException("duration must be between 1 ms and 2 hours");
+            if(ms<=0||ms>Timeline.MAX_MS)throw new IOException("duration must be between 1 ms and 2 hours");
             if(m.containsKey("durationMs")&&num(m,"durationMs")!=ms)throw new IOException("source changed; select again");
             int w=number(mm.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH),0),h=number(mm.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT),0);
             audio=mm.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO);video=mm.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO);
             m.put("durationMs",ms);m.put("width",w);m.put("height",h);m.put("hasAudio",audio);m.put("hasVideo",video);
-            vc="yes".equals(video)&&w>0&&h>0?videoCount(ms):0;
-            ac="yes".equals(audio)?audioCount(ms):0;
+            vc="yes".equals(video)&&w>0&&h>0?Timeline.videoCount(ms):0;
+            ac="yes".equals(audio)?Timeline.audioCount(ms):0;
             if(vc+ac==0)throw new IOException("no supported media tracks");
             m.put("videoSamplesPlanned",vc);m.put("audioChunksPlanned",ac);m.put("whisperModel",model.name);
             int cursor=(int)num(m,"videoCursor");int decoded=(int)num(m,"decodedFrames"),failed=(int)num(m,"labelFailures");
@@ -60,7 +52,7 @@ final class MediaPipeline {
                 ImageLabeler labeler=ImageLabeling.getClient(new ImageLabelerOptions.Builder().setConfidenceThreshold(0.5f).build());
                 try{
                     for(int i=cursor;i<vc;i++){
-                        check();long t=sample(ms,i,vc);
+                        check();long t=Timeline.sample(ms,i,vc);
                         Bitmap b=Build.VERSION.SDK_INT>=27?mm.getScaledFrameAtTime(t*1000,MediaMetadataRetriever.OPTION_CLOSEST,dw,dh):mm.getFrameAtTime(t*1000,MediaMetadataRetriever.OPTION_CLOSEST);
                         if(b==null){failed++;}else{
                             if(Math.max(b.getWidth(),b.getHeight())>1280){double k=1280.0/Math.max(b.getWidth(),b.getHeight());Bitmap smaller=Bitmap.createScaledBitmap(b,Math.max(1,(int)(b.getWidth()*k)),Math.max(1,(int)(b.getHeight()*k)),true);if(smaller!=b){b.recycle();b=smaller;}}
@@ -92,6 +84,7 @@ final class MediaPipeline {
                     m.put("audioStatus",!WhisperBridge.AVAILABLE?"runtime unavailable":"Whisper weight missing or checksum mismatch");
                     m.put("audioSkippedChunks",ac-cursor);cp.save(m,vc+cursor,vc+ac,"音频未处理：运行库或权重不可用");
                 }else{
+                    m.remove("audioSkippedChunks");
                     StringBuilder transcript=new StringBuilder(m.get("transcript") instanceof String?(String)m.get("transcript"):"");
                     List<Object> segments=m.get("audioSegments") instanceof List?new ArrayList<>((List<Object>)m.get("audioSegments")):new ArrayList<>();
                     double seconds=m.get("audioAnalyzedSeconds") instanceof Number?((Number)m.get("audioAnalyzedSeconds")).doubleValue():0;
@@ -102,7 +95,7 @@ final class MediaPipeline {
                         try{
                             float[] pcm=decodeAudio(c,uri,from,to);
                             if(pcm.length==0)throw new IOException("no PCM");
-                            String part=offsetTranscript(WhisperBridge.transcribe(ModelStore.file(c,model).getAbsolutePath(),pcm),from);
+                            String part=Timeline.offsetTranscript(WhisperBridge.transcribe(ModelStore.file(c,model).getAbsolutePath(),pcm),from);
                             check();if(transcript.length()+part.length()>400000)throw new IOException("transcript report limit");
                             transcript.append(part);seconds+=pcm.length/16000.0;
                             segments.add(McpServer.obj("fromMs",from,"toMs",to,"decodedSeconds",pcm.length/16000.0,"status","transcribed"));
