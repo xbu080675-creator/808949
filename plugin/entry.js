@@ -33,7 +33,7 @@ tavo.plugin.onInputAction('media',run(async()=>{
  }finally{await tavo.file.delete(f.path);}
 }));
 tavo.plugin.onInputAction('network',run(async()=>{
- const lines=['Tavo Multimodal 0.0.12'];
+ const lines=['Tavo Multimodal 0.0.13'];
  let stage='读取配置';
  try{
  const raw=String(tavo.plugin.config.get('endpoint')||'').trim();
@@ -56,7 +56,7 @@ tavo.plugin.onInputAction('network',run(async()=>{
  await report('network',lines);
 }));
 tavo.plugin.onInputAction('native',run(async()=>{
- const lines=['Tavo Multimodal 0.0.12','原生文件下载：固定公开测试地址，不携带密钥'];
+ const lines=['Tavo Multimodal 0.0.13','原生文件下载：固定公开测试地址，不携带密钥'];
  let path;
  try{
  path=await tavo.file.save('tavo-mm-network-probe-'+Date.now()+'.txt','https://example.com/',{scope:'chat'});
@@ -71,7 +71,7 @@ const promptText='Reply with exactly OK.';
 const modelTest=(id,fn)=>tavo.plugin.onInputAction(id,run(async()=>{
  if(busy){await toast('已有模型测试运行中');return;}
  busy=true;
- const lines=['Tavo Multimodal 0.0.12'];
+ const lines=['Tavo Multimodal 0.0.13'];
  try{await toast('正在测试，可能产生少量 API 费用');await fn(lines);}
  catch(e){lines.push('失败：'+errorText(e));}
  finally{busy=false;}
@@ -140,7 +140,10 @@ async function outputMediaRaw(type,text,chat,confirmed=false){
   let path;try{path=await tavo.image.generate(text,{timeout:120000,saveAs:'mm-'+Date.now()+'.png',scope:'chat'});}catch(e){const msg=errorText(e);if(/402/.test(msg))throw new Error('HTTP 402：检查生图余额或权限');if(/404|Model not found/i.test(msg))throw new Error('HTTP 404：检查生图模型名称及服务商支持');throw e;}
   await active(chat.id);
   if(typeof path!=='string'||!path.startsWith('files/'))throw new Error('生图未返回有效路径');
+  if(!safeImage(path))throw new Error('图片路径异常');
+  await cacheRecord(chat.id,path,false);
   await tavo.variable.set(key+'.lastImage',path,'chat');
+  if(enabled('autoInsertImage')){try{await appendCleanImage(chat.id,path);return;}catch(e){await toast('图片已生成，自动插入失败，可手动插入');}}
   await tavo.utils.preview(path);
  }else if(type==='voice'){
   const rows=await tavo.message.find(-1,{role:'assistant'});
@@ -168,7 +171,7 @@ tavo.plugin.onInputAction('lastImage',run(async()=>{const p=await tavo.variable.
 
 const diagKey=key+'.mediaDiag';
 const diagnostic=(id,fn)=>tavo.plugin.onInputAction(id,mediaRun(async()=>{
- let stage='开始';const lines=['Tavo Multimodal 0.0.12',id];
+ let stage='开始';const lines=['Tavo Multimodal 0.0.13',id];
  try{await fn(v=>{stage=v;lines.push(v);});lines.push(debugMode()&&id!=='askProbe'?'调试模式：未调用媒体 API':'操作完成');}
  catch(e){lines.push(stage+'：'+errorText(e));}
  await tavo.variable.set(diagKey+'.'+id,lines.join('\n'),'global');await toast(lines[lines.length-1]);
@@ -251,7 +254,7 @@ tavo.plugin.onInputAction('autoReport',run(async()=>{
  await logQueue;
  const rows=await tavo.variable.get(logKey,'global');
  const p=await tavo.variable.get(pauseKey,'chat');
- await tavo.utils.export('tavo-auto-report.txt',['Tavo Multimodal 0.0.12','媒体调试：'+debugMode(),'当前聊天暂停：'+JSON.stringify(p||{}),'已注册：'+registered.join(', '),'日志写入失败次数：'+logErrors,...Array.from(new Set([...(Array.isArray(rows)?rows:[]),...sessionLog]))].join('\n'));
+ await tavo.utils.export('tavo-auto-report.txt',['Tavo Multimodal 0.0.13','媒体调试：'+debugMode(),'当前聊天暂停：'+JSON.stringify(p||{}),'已注册：'+registered.join(', '),'日志写入失败次数：'+logErrors,...Array.from(new Set([...(Array.isArray(rows)?rows:[]),...sessionLog]))].join('\n'));
 }));
 tavo.plugin.onInputAction('resumeAuto',mediaRun(async()=>{
  await tavo.variable.set(pauseKey,{},'chat');await autoLog('手动解除暂停');await toast('已解除自动暂停；调试开关保持不变');
@@ -325,7 +328,7 @@ tavo.plugin.onInputAction('hookProbe',run(async()=>{await autoLog('手动事件�
 const freqKey=key+'.frequency11';
 const profileKey=id=>key+'.visual11.c'+String(id);
 const mediaMarker='[Tavo-MM 图片]';
-const isMediaMessage=v=>typeof v==='string'&&v.startsWith(mediaMarker);
+const isMediaMessage=v=>typeof v==='string'&&(v.startsWith(mediaMarker)||(/^!\[图片\]\((files\/chat\/mm-[a-z0-9-]+\.(?:png|jpg|jpeg|webp))\)$/i.test(v.trim())));
 const answerValue=v=>typeof v==='string'?v:v&&v.status==='answered'&&typeof v.answer==='string'?v.answer:null;
 const interval=(type)=>{const n=Number(tavo.plugin.config.get(type+'Interval'));return [1,2,3,5,10].includes(n)?n:({plan:3,voice:2,image:5}[type]);};
 const caps={plan:20,voice:12,image:3};
@@ -363,18 +366,67 @@ tavo.plugin.onInputAction('visualEdit',mediaRun(async()=>{
 }));
 tavo.plugin.onInputAction('visualExport',mediaRun(async()=>{const {member}=await currentMember();const v=await tavo.variable.get(profileKey(member.id),'global');await tavo.utils.export('tavo-visual-profile.txt',JSON.stringify({name:member.name,visual:v||''},null,2));}));
 tavo.plugin.onInputAction('visualClear',mediaRun(async()=>{const {c,member}=await currentMember();if(answerValue(await tavo.utils.ask({question:'清空当前角色视觉档案？',options:['清空','取消'],allowOther:false}))!=='清空')return;await active(c.id);await tavo.variable.set(profileKey(member.id),'','global');await toast('视觉档案已清空');}));
-tavo.plugin.onInputAction('frequencyReport',run(async()=>{const f=await tavo.variable.get(freqKey,'chat');await tavo.utils.export('tavo-frequency.txt',JSON.stringify({version:'0.0.12',debug:debugMode(),intervals:{plan:interval('plan'),voice:interval('voice'),image:interval('image')},caps,state:f||{}},null,2));}));
+tavo.plugin.onInputAction('frequencyReport',run(async()=>{const f=await tavo.variable.get(freqKey,'chat');await tavo.utils.export('tavo-frequency.txt',JSON.stringify({version:'0.0.13',debug:debugMode(),intervals:{plan:interval('plan'),voice:interval('voice'),image:interval('image')},caps,state:f||{}},null,2));}));
 const safeImage=p=>typeof p==='string'&&/^files\/chat\/mm-[a-z0-9-]+\.(png|jpg|jpeg|webp)$/i.test(p);
 tavo.plugin.onInputAction('importMediaProbe',mediaRun(async()=>{
  const c=await tavo.chat.current();if(!c)throw new Error('无活动聊天');
  const files=await tavo.file.import({scope:'tmp',extensions:['png','jpg','jpeg','webp','mp3','wav','m4a','mp4','webm','ogg'],multiple:false});if(!files?.length)return;
  const f=files[0];try{if(!Number.isFinite(f.size)||f.size<1||f.size>20*1024*1024)throw new Error('请选择不超过20MB的文件');const data=await tavo.file.load(f.path,{encoding:'base64'});if(!data)throw new Error('读取失败');await toast('本地读取成功 '+f.size+' 字节；未上传、未理解内容');
- const ext=String(f.name||f.path).split('.').pop().toLowerCase();if(['png','jpg','jpeg','webp'].includes(ext)&&answerValue(await tavo.utils.ask({question:'将此图片保存到当前聊天，以测试聊天内展示？',options:['保存','取消'],allowOther:false}))==='保存'){await active(c.id);const p=await tavo.file.save('mm-import-'+Date.now()+'.'+ext,data,{scope:'chat',encoding:'base64'});if(!safeImage(p))throw new Error('图片路径异常');await tavo.variable.set(key+'.lastImage',p,'chat');await toast('已保存；可点击插入最近图片');}
+ const ext=String(f.name||f.path).split('.').pop().toLowerCase();if(['png','jpg','jpeg','webp'].includes(ext)&&answerValue(await tavo.utils.ask({question:'将此图片保存到当前聊天，以测试聊天内展示？',options:['保存','取消'],allowOther:false}))==='保存'){await active(c.id);const p=await tavo.file.save('mm-import-'+Date.now()+'.'+ext,data,{scope:'chat',encoding:'base64'});if(!safeImage(p))throw new Error('图片路径异常');await cacheRecord(c.id,p,false);await tavo.variable.set(key+'.lastImage',p,'chat');await toast('已保存；可点击插入最近图片');}
  }finally{await tavo.file.delete(f.path);}
 }));
 tavo.plugin.onInputAction('insertImage',mediaRun(async()=>{
  const {c,member}=await currentMember();const p=await tavo.variable.get(key+'.lastImage','chat');if(!safeImage(p))throw new Error('暂无可插入的本地图片');
  if(answerValue(await tavo.utils.ask({question:'将最近图片作为新角色消息插入？图片路径可能进入后续模型上下文。',options:['插入','取消'],allowOther:false}))!=='插入')return;
- await active(c.id);const id=await tavo.message.append({role:'assistant',characterId:member.id,content:mediaMarker+'\n\n![图片]('+p+')',hidden:false});if(id==null)throw new Error('追加图片消息失败');await toast('图片消息已追加，请检查实际显示');
+ await appendCleanImage(c.id,p);
 }));
+
+const cacheKey=key+'.cache13',visionKey=key+'.vision13';
+async function cacheRows(){const a=await tavo.variable.get(cacheKey,'chat');return Array.isArray(a)?a.filter(x=>x&&safeImage(x.path)):[];}
+async function cacheRecord(id,path,protectedFile){
+ if(!safeImage(path))throw new Error('缓存路径异常');await active(id);
+ const a=await cacheRows();const prev=a.find(x=>x.path===path);const row={path,protected:!!(protectedFile||prev?.protected),at:prev?.at||new Date().toISOString()};
+ await active(id);await tavo.variable.set(cacheKey,[...a.filter(x=>x.path!==path),row],'chat');
+}
+async function appendCleanImage(id,path){
+ if(!safeImage(path))throw new Error('图片路径异常');await active(id);
+ const {c,member}=await currentMember();if(c.id!==id)throw new Error('会话已切换');
+ await cacheRecord(id,path,true);await active(id);
+ const result=await tavo.message.append({role:'assistant',characterId:member.id,content:'![图片]('+path+')',hidden:false});
+ if(result==null||result===false)throw new Error('追加图片消息失败');await toast('图片已插入聊天');
+}
+tavo.plugin.onInputAction('cacheReport',mediaRun(async()=>{
+ const c=await tavo.chat.current();if(!c)throw new Error('无活动聊天');const rows=await cacheRows();await active(c.id);
+ await tavo.utils.export('tavo-media-cache.txt',JSON.stringify({version:'0.0.13',total:rows.length,protected:rows.filter(x=>x.protected).length,entries:rows},null,2));
+}));
+tavo.plugin.onInputAction('cacheClean',mediaRun(async()=>{
+ const c=await tavo.chat.current();if(!c)throw new Error('无活动聊天');const rows=await cacheRows();const candidates=rows.filter(x=>!x.protected);
+ if(!candidates.length){await toast('暂无未插入缓存');return;}
+ if(answerValue(await tavo.utils.ask({question:'清理 '+candidates.length+' 个未插入缓存？已插入或旧版未登记的文件不会删除。',options:['清理','取消'],allowOther:false}))!=='清理')return;
+ await active(c.id);const n=await tavo.message.count();if(!Number.isInteger(n)||n<0)throw new Error('无法检查聊天引用，取消清理');
+ const refs=new Set();for(let i=0;i<n;i++){
+ await active(c.id);const m=await tavo.message.find(i);if(!Array.isArray(m)||m.length!==1||typeof m[0].content!=='string')throw new Error('无法完整检查聊天引用，取消清理');
+ for(const x of candidates)if(m[0].content.includes(x.path))refs.add(x.path);
+ }
+ await active(c.id);if(await tavo.message.count()!==n)throw new Error('聊天已变化，取消清理');
+ const removed=new Set();for(const x of candidates){if(refs.has(x.path))continue;await active(c.id);const ok=await tavo.file.delete(x.path);if(ok===true)removed.add(x.path);}
+ await active(c.id);await tavo.variable.set(cacheKey,rows.filter(x=>!removed.has(x.path)),'chat');const last=await tavo.variable.get(key+'.lastImage','chat');if(removed.has(last))await tavo.variable.set(key+'.lastImage','','chat');await toast('清理完成 '+removed.size+' 个；已引用图片保留');
+}));
+tavo.plugin.onInputAction('visionProbe',mediaRun(async()=>{
+ const c=await tavo.chat.current();if(!c)throw new Error('无活动聊天');
+ if(typeof tavo.decision?.evaluate!=='function'){await toast('当前 Tavo 版本没有决策 API；可使用原生图片发送');return;}
+ if(typeof tavo.decision.isAvailable==='function'&&!await tavo.decision.isAvailable()){await toast('请在模型与服务 → 高级服务 → 决策 API 配置默认连接');return;}
+ const files=await tavo.file.import({scope:'tmp',extensions:['png','jpg','jpeg'],multiple:false});if(!files?.length)return;const f=files[0];
+ try{
+ const format=String(f.name||f.path).split('.').pop().toLowerCase();if(!['png','jpg','jpeg'].includes(format)||!Number.isFinite(f.size)||f.size<1||f.size>20*1024*1024)throw new Error('请选择不超过20MB的 PNG 或 JPEG 图片');
+ if(answerValue(await tavo.utils.ask({question:'将所选图片发送至 Tavo 默认决策 API 进行视觉识别？可能计费，不受零媒体费用调试拦截。',options:['发送识别','取消'],allowOther:false}))!=='发送识别')return;
+ await active(c.id);const data=await tavo.file.load(f.path,{encoding:'base64'});if(!data)throw new Error('图片读取失败');await active(c.id);
+ const result=await tavo.decision.evaluate({state:'Inspect image photo. Judge only visible content, not filename or hidden information.',assets:{photo:{type:'image',format,data_base64:data}},questions:{category:{type:'choice',instructions:'Choose the main visible subject of photo.',criteria:{board:'Board game or game board',person:'Person or character',animal:'Animal',scene:'Landscape or indoor scene',document:'Text or document',other:'Other or unclear'}},board:{type:'noul',instructions:'Does photo show a board game with pieces on a grid?'},text:{type:'noul',instructions:'Does photo contain clearly visible text?'}}},{timeout:60000});
+ if(!result){await toast('识别已取消');return;}
+ const categories=['board','person','animal','scene','document','other'];const a=result.answers||{};const probability=x=>x?.type==='noul'&&Number.isFinite(x.noul)&&x.noul>=0&&x.noul<=1?x.noul:null;
+ const out={version:'0.0.13',category:a.category?.type==='choice'&&categories.includes(a.category.choice)?a.category.choice:null,board:probability(a.board),text:probability(a.text)};
+ if(out.category===null&&out.board===null&&out.text===null)throw new Error('服务未返回有效视觉判断');await active(c.id);await tavo.variable.set(visionKey,out,'chat');await toast('图片识别：'+(out.category||'无分类')+'；可导出报告');
+ }finally{await tavo.file.delete(f.path);}
+}));
+tavo.plugin.onInputAction('visionReport',run(async()=>{const v=await tavo.variable.get(visionKey,'chat');if(!v){await toast('暂无图片识别结果');return;}await tavo.utils.export('tavo-vision-report.txt',JSON.stringify(v,null,2));}));
 })();
