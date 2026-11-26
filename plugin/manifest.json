@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "Tavo Multimodal",
   "description": "多模态技术验证：手动检查宿主接口、配置、变量存储及媒体文件读取，不自动发送聊天内容。",
   "localization": {
@@ -36,13 +36,21 @@
       {
         "id": "report",
         "label": "导出网络诊断报告"
+      },
+      {
+        "id": "generate",
+        "label": "测试 Tavo 原生模型（可能计费）"
+      },
+      {
+        "id": "post",
+        "label": "测试独立 POST（无认证）"
       }
     ],
     "settings": {
       "schema": [
         {
           "type": "info",
-          "text": "仅手动测试，不自动发送聊天内容或媒体。网络测试不携带密钥。",
+          "text": "手动模型测试可能计费；仅发送固定测试文本，不发送聊天或媒体。独立 POST 不携带密钥。",
           "icon": "info"
         },
         {
@@ -60,7 +68,7 @@
         {
           "key": "protocol",
           "type": "select",
-          "label": "协议（预留）",
+          "label": "独立 POST 协议",
           "default": "openai",
           "options": [
             {
