@@ -24,7 +24,7 @@ final class MediaPipeline {
     static int number(String x,int fallback){try{return Integer.parseInt(x);}catch(Exception e){return fallback;}}
     static int[] fingerprint(Bitmap b){int[] a=new int[64];for(int i=0;i<64;i++){int p=b.getPixel((i%8)*(b.getWidth()-1)/7,(i/8)*(b.getHeight()-1)/7);a[i]=(77*((p>>16)&255)+150*((p>>8)&255)+29*(p&255))>>8;}return a;}
     static int difference(int[] a,int[] b){int d=0;for(int i=0;i<64;i++)d+=Math.abs(a[i]-b[i]);return d/64;}
-    static Map<String,Object> analyze(Context c,Uri uri,File dir,Consumer<String> progress)throws Exception{
+    static synchronized Map<String,Object> analyze(Context c,Uri uri,File dir,Consumer<String> progress)throws Exception{
         Map<String,Object> m=McpServer.obj();MediaMetadataRetriever mm=new MediaMetadataRetriever();
         List<Object> frames=new ArrayList<>();List<int[]> seen=new ArrayList<>();
         try{
@@ -52,12 +52,12 @@ final class MediaPipeline {
                             seen.add(fp);decoded++;
                             File out=new File(dir,"frame-"+t+".jpg");try(OutputStream f=new FileOutputStream(out)){if(!b.compress(Bitmap.CompressFormat.JPEG,95,f))throw new IOException("JPEG failed");}
                             List<Object> labels=new ArrayList<>();try{
-                                List<ImageLabel> got=Tasks.await(labeler.process(InputImage.fromBitmap(b,0)),20,TimeUnit.SECONDS);
+                                List<ImageLabel> got=new ArrayList<>(Tasks.await(labeler.process(InputImage.fromBitmap(b,0)),20,TimeUnit.SECONDS));
                                 got.sort((x,y)->Float.compare(y.getConfidence(),x.getConfidence()));
                                 for(ImageLabel x:got.subList(0,Math.min(3,got.size())))labels.add(McpServer.obj("label",x.getText(),"confidence",Math.round(x.getConfidence()*100)/100.0));
                                 frames.add(McpServer.obj("sampleMs",t,"items",labels));
                             }catch(InterruptedException e){throw e;}catch(Exception e){failed++;}
-                        }finally{b.recycle();}
+                        }finally{/* Let the pending ML Kit task retain its bitmap if cancelled or timed out. */}
                     }
                     m.put("decodedFrames",decoded);m.put("labelFailures",failed);
                     if(!frames.isEmpty())m.put("labels",frames);
