@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "author": "Tavo Multimodal",
   "description": "多模态决策、语音和生图联动；默认媒体调试模式，不调用生图或 TTS。",
   "localization": {
@@ -110,13 +110,17 @@
       {
         "id": "readProbe",
         "label": "测试消息读取（不调用 API）"
+      },
+      {
+        "id": "hookProbe",
+        "label": "检查事件注册（不调用 API）"
       }
     ],
     "settings": {
       "schema": [
         {
           "type": "info",
-          "text": "默认媒体调试模式拦截插件发起的生图和 TTS。智能分析和图片规划仍调用当前文本模型，可能计费；自动分析仅在相关开关开启时执行。",
+          "text": "默认媒体调试拦截插件生图和 TTS；分析及规划会将近期消息和当前角色描述发送至当前文本模型，可能计费。事件日志仅记录结构和状态。",
           "icon": "info"
         },
         {
