@@ -2,9 +2,9 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "author": "Tavo Multimodal",
-  "description": "多模态技术验证：手动检查宿主接口、配置、变量存储及媒体文件读取，不自动发送聊天内容。",
+  "description": "多模态决策、语音和生图联动；默认媒体调试模式，不调用生图或 TTS。",
   "localization": {
     "defaultLocale": "zh-CN"
   },
@@ -98,13 +98,25 @@
       {
         "id": "forcePlan",
         "label": "强制图片规划（可能计费）"
+      },
+      {
+        "id": "autoReport",
+        "label": "导出自动事件记录"
+      },
+      {
+        "id": "resumeAuto",
+        "label": "解除自动任务暂停"
+      },
+      {
+        "id": "readProbe",
+        "label": "测试消息读取（不调用 API）"
       }
     ],
     "settings": {
       "schema": [
         {
           "type": "info",
-          "text": "手动意图分析会将最近最多六条可见消息的部分文本发送到当前模型，可能计费；仅预览，不生成媒体。其他测试不发送聊天内容。",
+          "text": "默认媒体调试模式拦截插件发起的生图和 TTS。智能分析和图片规划仍调用当前文本模型，可能计费；自动分析仅在相关开关开启时执行。",
           "icon": "info"
         },
         {
@@ -158,6 +170,12 @@
           "type": "switch",
           "label": "自动分析并生图（可能计费）",
           "default": false
+        },
+        {
+          "key": "debugMode",
+          "type": "switch",
+          "label": "零媒体费用调试模式",
+          "default": true
         }
       ]
     }
