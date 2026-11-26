@@ -1,9 +1,10 @@
 (function(){
 'use strict';
-const MAX=20*1024*1024;
+const M=1024*1024,MAX=100*M;
+const videoLimit=()=>String(tavo.plugin.config.get('videoReadLimit'))==='100'?100*M:50*M;
 const fail=(message,code)=>{throw Object.assign(new Error(message),{code});};
 function inspect(bytes,signal){
- if(Object.prototype.toString.call(bytes)!=='[object Uint8Array]'||!bytes.length||bytes.length>MAX)fail('媒体字节无效或超过20 MiB','too_large');
+ if(Object.prototype.toString.call(bytes)!=='[object Uint8Array]'||!bytes.length||bytes.length>MAX)fail('媒体字节无效或超过100 MiB','too_large');
  const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),n=bytes.length;
  let budget=4096;
  const check=()=>{if(signal?.aborted)throw new Error('媒体处理已取消');if(--budget<0)fail('媒体结构过于复杂','unsupported_format');};
@@ -41,7 +42,11 @@ function inspect(bytes,signal){
 if(tavo.plugin.config.get('localMediaInput')===true)tavo.plugin.registerFileProcessor('local-media-meta',{
  async extract(file,{signal}={}){
   if(signal?.aborted)throw new Error('媒体处理已取消');
-  if(!Number.isSafeInteger(file.size)||file.size<1||file.size>MAX)fail('请选择不超过20 MiB的媒体文件','too_large');
+  const ext=String(file.name||file.path||'').split('.').pop().toLowerCase();
+  const video=['mp4','mov'].includes(ext);
+  const accept=(video?200:50)*M,read=video?videoLimit():50*M;
+  if(!Number.isSafeInteger(file.size)||file.size<1||file.size>accept)fail('媒体超过附件上限（音频50 MiB，视频200 MiB）','too_large');
+  if(file.size>read)return {content:'[大型视频附件：仅文件基本信息；未读取字节，未解析时长、分辨率或轨道，未理解画面及声音。]\n'+JSON.stringify({size:file.size,extension:ext,readStatus:'size-only'})};
   const bytes=await tavo.file.load(file.path,{encoding:'bytes'});if(signal?.aborted)throw new Error('媒体处理已取消');
   if(bytes?.length!==file.size)throw new Error('媒体读取长度不一致');
   const metadata=inspect(bytes,signal);
