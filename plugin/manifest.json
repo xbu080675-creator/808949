@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "author": "Tavo Multimodal",
   "description": "多模态决策、语音和生图联动；默认媒体调试模式，不调用生图或 TTS。",
   "localization": {
@@ -138,6 +138,22 @@
       {
         "id": "insertImage",
         "label": "插入最近图片到聊天"
+      },
+      {
+        "id": "cacheReport",
+        "label": "导出图片缓存记录"
+      },
+      {
+        "id": "cacheClean",
+        "label": "清理未插入图片缓存"
+      },
+      {
+        "id": "visionProbe",
+        "label": "图片内容识别（决策 API，可能计费）"
+      },
+      {
+        "id": "visionReport",
+        "label": "导出图片识别报告"
       }
     ],
     "settings": {
@@ -288,6 +304,12 @@
               "label": "每 10 条角色回复"
             }
           ]
+        },
+        {
+          "key": "autoInsertImage",
+          "type": "switch",
+          "label": "生图成功后自动插入聊天",
+          "default": false
         }
       ]
     }
