@@ -1,0 +1,28 @@
+name: Build Tavo plugin
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'plugin/**'
+      - '.github/workflows/build.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate and package
+        run: |
+          node --check plugin/entry.js
+          node -e "JSON.parse(require('fs').readFileSync('plugin/manifest.json','utf8'))"
+          mkdir -p dist
+          cd plugin
+          zip -r ../dist/Tavo-Multimodal-v0.0.1.tpg manifest.json entry.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tavo-Multimodal-v0.0.1
+          path: dist/*.tpg
