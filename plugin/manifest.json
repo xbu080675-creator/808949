@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "author": "Tavo Multimodal",
   "description": "多模态技术验证：手动检查宿主接口、配置、变量存储及媒体文件读取，不自动发送聊天内容。",
   "localization": {
@@ -68,6 +68,22 @@
       {
         "id": "lastImage",
         "label": "查看最近生成图片"
+      },
+      {
+        "id": "askProbe",
+        "label": "测试输入弹窗"
+      },
+      {
+        "id": "imageProbe",
+        "label": "固定图片测试（点击即生成，可能计费）"
+      },
+      {
+        "id": "voiceProbe",
+        "label": "固定语音测试（点击即播放，可能计费）"
+      },
+      {
+        "id": "mediaReport",
+        "label": "导出媒体诊断"
       }
     ],
     "settings": {
