@@ -57,3 +57,6 @@ message:added 自动联动，开关默认关闭，最近100条消息ID去重，�
 
 ## v0.0.19 / Engine v0.1.0
 TPG 新增本地 MCP 服务显式配对、状态测试、元数据任务报告及解除配对。保留原功能。Engine 原生 Android UI、前台服务、127.0.0.1:8765/mcp、随机 Bearer token、Host/Origin 检查、手动授权元数据。JVM 真实 HTTP 13 项测试通过，TPG 回归与 MCP 模拟测试通过。Android SDK 不可用，未本地编译或手机实测；GitHub Actions 配置 APK 编译和签名验证，结果待确认。模型推理、自动媒体传输、自动注入暂未实现。
+
+## v0.0.20 / Engine v0.2.0
+TPG 保留旧功能，兼容0.1.0/0.2.0，新增 MCP 任务状态、授权取消、真实分析结果显式授权后单次上下文注入。APK 源码新增四页 UI、硬件检测、MediaMetadataRetriever 高清场景采样、ML Kit bundled image labels、Whisper Base 下载及 SHA-256 校验；独立可选 ARM64 构建使用 whisper.cpp v1.7.6 JNI 与 MediaCodec PCM 重采样，前180秒分段转录。JDK MCP 核心14项真实 HTTP 断言通过、TPG 原功能与新增功能模拟测试通过。Android 编译、模型推理与下载实测待确认；未实现完整 VLM、自动跨应用提交视频及持久后台任务。普通视觉版与 Whisper 实验版分别构建并验证签名。
