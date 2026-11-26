@@ -60,3 +60,6 @@ TPG 新增本地 MCP 服务显式配对、状态测试、元数据任务报告�
 
 ## v0.0.20 / Engine v0.2.0
 TPG 保留旧功能，兼容0.1.0/0.2.0，新增 MCP 任务状态、授权取消、真实分析结果显式授权后单次上下文注入。APK 源码新增四页 UI、硬件检测、MediaMetadataRetriever 高清场景采样、ML Kit bundled image labels、Whisper Base 下载及 SHA-256 校验；独立可选 ARM64 构建使用 whisper.cpp v1.7.6 JNI 与 MediaCodec PCM 重采样，前180秒分段转录。JDK MCP 核心14项真实 HTTP 断言通过、TPG 原功能与新增功能模拟测试通过。Android 编译、模型推理与下载实测待确认；未实现完整 VLM、自动跨应用提交视频及持久后台任务。普通视觉版与 Whisper 实验版分别构建并验证签名。
+
+## v0.0.21 / Engine v0.3.0
+TPG 支持0.3.0、MCP百分比/ETA、长报告两分钟片段授权注入，旧功能保留；语法、回归及长报告测试、ZIP及源码哈希通过。Engine 源码新增 service-owned worker、有限 wake lock、通知栏进度/取消/完成提醒、AtomicFile 最近任务检查点和手动恢复；Base/Small独立下载校验；全时间轴最多96采样点、30秒音频窗口、2小时媒体限制、失败段记录。纯Java时间轴测试用345110ms视频得到70点、最后342644ms、12个音频窗口；JDK MCP实际HTTP 12项断言通过（供应者模拟）。Android SDK/NDK不可用，APK、锁屏、MediaCodec长音频、Small及恢复实机均未验证。完整VLM、自动媒体跨应用提交、多任务历史和MCP自动轮询未实现。
