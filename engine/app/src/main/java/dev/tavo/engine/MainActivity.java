@@ -39,10 +39,26 @@ public class MainActivity extends Activity {
     }
     final Handler handler=new Handler(Looper.getMainLooper());
     final ExecutorService work=Executors.newSingleThreadExecutor();
-    Future<?> task;int seq=0;Map<String,Object> local;
+    // Completed data belongs to the engine process, not an Activity instance.
+    // Access and mutation occur on the Android main thread.
+    private static final class Completed {
+        final Map<String,Object> media; final Bitmap picture;
+        Completed(Map<String,Object> media,Bitmap picture){this.media=Collections.unmodifiableMap(new LinkedHashMap<>(media));this.picture=picture;}
+    }
+    private static Completed completed;
+    private Completed displayed;
+    Future<?> task;int seq=0;
     LinearLayout root,host;LinearLayout[] pages=new LinearLayout[4];Button[] tabs=new Button[4];
     TextView state,taskView,modelView,detail;ImageView preview;boolean alive=true;
-    final Runnable refresh=new Runnable(){public void run(){if(!alive)return;state.setText(serviceState);taskView.setText(taskState);modelView.setText(ModelStore.status(MainActivity.this));handler.postDelayed(this,1200);}};
+    final Runnable refresh=new Runnable(){public void run(){if(!alive)return;state.setText(serviceState);renderCompleted();taskView.setText(taskState);modelView.setText(ModelStore.status(MainActivity.this));handler.postDelayed(this,1200);}};
+    void renderCompleted(){
+        Completed current=completed;
+        if("done".equals(phase)&&current==null){phase="idle";taskState="结果已失效 · 请重新分析";}
+        if(displayed==current)return;
+        displayed=current;
+        if(current==null){preview.setImageDrawable(null);detail.setText("暂无结果");}
+        else {preview.setImageBitmap(current.picture);detail.setText(McpServer.json(current.media));}
+    }
     int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     TextView label(LinearLayout p,String text,int size,int color){TextView v=new TextView(this);v.setText(text);v.setTextSize(size);v.setTextColor(color);v.setPadding(0,dp(5),0,dp(5));p.addView(v);return v;}
     LinearLayout card(String title){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(18),dp(14),dp(18),dp(14));GradientDrawable bg=new GradientDrawable();bg.setColor(0xff222631);bg.setCornerRadius(dp(20));p.setBackground(bg);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,dp(12));root.addView(p,lp);TextView t=label(p,title,17,0xffe7e4ff);t.setTypeface(null,Typeface.BOLD);return p;}
@@ -53,7 +69,7 @@ public class MainActivity extends Activity {
     void copyToken(){ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);ClipData clip=ClipData.newPlainText("MCP token",token(this));if(Build.VERSION.SDK_INT>=33){PersistableBundle extras=new PersistableBundle();extras.putBoolean("android.content.extra.IS_SENSITIVE",true);clip.getDescription().setExtras(extras);}cm.setPrimaryClip(clip);tell("已复制，请仅粘贴到 Tavo 鉴权设置");}
     void startEngine(){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},5);try{startForegroundService(new Intent(this,EngineService.class));}catch(Exception e){tell("无法启动服务");}}
     void selectMedia(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"video/*","audio/*"});i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,21);}
-    void cancelTask(){seq++;remoteCancel.set(null);if(task!=null)task.cancel(true);local=null;shared=null;phase="cancelled";taskState="已取消；原生推理可能在当前30秒分段结束后退出";detail.setText("");preview.setImageDrawable(null);}
+    void cancelTask(){seq++;remoteCancel.set(null);if(task!=null)task.cancel(true);completed=null;shared=null;phase="cancelled";taskState="已取消；原生推理可能在当前30秒分段结束后退出";renderCompleted();}
     @Override public void onCreate(Bundle b){
         super.onCreate(b);getWindow().setStatusBarColor(0xff151820);getWindow().setNavigationBarColor(0xff151820);
         LinearLayout shell=new LinearLayout(this);shell.setOrientation(1);shell.setBackgroundColor(0xff151820);shell.setPadding(dp(16),dp(12),dp(16),dp(8));setContentView(shell);
@@ -67,20 +83,20 @@ public class MainActivity extends Activity {
         button(c,"取消下载 / 删除权重",()->new AlertDialog.Builder(this).setTitle("删除已下载权重？").setNegativeButton("返回",null).setPositiveButton("删除",(d,w)->{if(task!=null&&!task.isDone()){tell("请等当前分析完成");return;}try{ModelStore.delete(this);tell("已删除");}catch(Exception e){tell(e.getMessage());}}).show());
         c=card("后续视觉语言模型");label(c,"SmolVLM2 / Qwen3-VL：待集成 llama.cpp 多模态运行时。此版不下载无法使用的模型。",14,0xffaab1c4);
         root=pages[2];c=card("媒体任务");taskView=label(c,taskState,15,Color.WHITE);button(c,"选择视频 / 音频并分析",this::selectMedia);button(c,"取消任务",this::cancelTask);button(c,"允许 MCP 取消当前任务",()->{if(!"running".equals(phase)){tell("暂无运行中任务");return;}final int job=seq;remoteCancel.set(()->handler.post(()->{if(alive&&seq==job&&"running".equals(phase))cancelTask();}));tell("当前任务可由已配对客户端取消");});
-        button(c,"授权 MCP 读取本次分析",()->{if(local==null){tell("暂无完成任务");return;}new AlertDialog.Builder(this).setTitle("授权共享分析文字？").setMessage("只共享标签、转录及元数据；不共享原始文件或抽帧图片。").setNegativeButton("返回",null).setPositiveButton("授权",(d,w)->{if(local!=null){shared=new LinkedHashMap<>(local);tell("已授权");}}).show();});button(c,"撤销共享",()->{shared=null;tell("已撤销");});
+        button(c,"授权 MCP 读取本次分析",()->{Completed selected=completed;if(selected==null||!"done".equals(phase)){renderCompleted();tell("暂无完成任务");return;}new AlertDialog.Builder(this).setTitle("授权共享分析文字？").setMessage("只共享标签、转录及元数据；不共享原始文件或抽帧图片。").setNegativeButton("返回",null).setPositiveButton("授权",(d,w)->{if(completed==selected&&"done".equals(phase)){shared=new LinkedHashMap<>(selected.media);tell("已授权");}else tell("任务已变化，请重新检查结果");}).show();});button(c,"撤销共享",()->{shared=null;tell("已撤销");});
         preview=new ImageView(this);preview.setAdjustViewBounds(true);preview.setScaleType(ImageView.ScaleType.FIT_CENTER);c.addView(preview,new LinearLayout.LayoutParams(-1,dp(220)));detail=label(c,"暂无结果",13,0xffaab1c4);detail.setTextIsSelectable(true);
         root=pages[3];c=card("隐私与说明");label(c,"服务仅监听 127.0.0.1，需要随机令牌。原始媒体和图片留在本机；授权分享后，Tavo 可将分析文字交给聊天模型。任务在应用后台运行期间可继续，但关闭应用或系统回收可能中断。Whisper 最多转录前180秒，取消在分段边界生效。",14,0xffaab1c4);button(c,"复制配对令牌",this::copyToken);button(c,"撤销媒体共享及远程取消",()->{shared=null;remoteCancel.set(null);tell("已撤销");});
-        LinearLayout nav=new LinearLayout(this);nav.setOrientation(0);String[] titles={"首页","模型","任务","设置"};for(int i=0;i<4;i++){final int n=i;tabs[i]=makeButton(titles[i],()->page(n));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(2),dp(6),dp(2),0);nav.addView(tabs[i],lp);}shell.addView(nav);page(0);handler.post(refresh);
+        LinearLayout nav=new LinearLayout(this);nav.setOrientation(0);String[] titles={"首页","模型","任务","设置"};for(int i=0;i<4;i++){final int n=i;tabs[i]=makeButton(titles[i],()->page(n));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(2),dp(6),dp(2),0);nav.addView(tabs[i],lp);}shell.addView(nav);page(0);renderCompleted();handler.post(refresh);
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);if(request!=21||result!=RESULT_OK||data==null||data.getData()==null)return;
-        Uri uri=data.getData();if(task!=null)task.cancel(true);final int job=++seq;remoteCancel.set(null);local=null;shared=null;phase="running";taskState="准备本机分析";detail.setText("");preview.setImageDrawable(null);
+        Uri uri=data.getData();if(task!=null)task.cancel(true);final int job=++seq;remoteCancel.set(null);completed=null;shared=null;phase="running";taskState="准备本机分析";renderCompleted();
         task=work.submit(()->{File dir=new File(getCacheDir(),"frames20-"+UUID.randomUUID());try{
             if(!dir.mkdirs())throw new IllegalStateException("cache unavailable");
             Map<String,Object> m=MediaPipeline.analyze(this,uri,dir,s->handler.post(()->{if(alive&&job==seq)taskState=s;}));
             File[] frames=dir.listFiles((d,name)->name.endsWith(".jpg"));Bitmap bitmap=null;if(frames!=null&&frames.length>0){Arrays.sort(frames);bitmap=BitmapFactory.decodeFile(frames[0].getAbsolutePath());}
-            final Bitmap pic=bitmap;handler.post(()->{if(alive&&job==seq){local=m;phase="done";remoteCancel.set(null);taskState="已完成 · 请检查并授权分享";preview.setImageBitmap(pic);detail.setText(McpServer.json(m));}else if(pic!=null)pic.recycle();});
+            final Bitmap pic=bitmap;handler.post(()->{if(alive&&job==seq){completed=new Completed(m,pic);phase="done";remoteCancel.set(null);taskState="已完成 · 请检查并授权分享";renderCompleted();}else if(pic!=null)pic.recycle();});
         }catch(InterruptedException ignored){}catch(Exception e){handler.post(()->{if(alive&&job==seq){phase="failed";remoteCancel.set(null);taskState="处理失败 · "+e.getClass().getSimpleName();}});}finally{File[] files=dir.listFiles();if(files!=null)for(File file:files)file.delete();dir.delete();}});
     }
-    @Override protected void onDestroy(){alive=false;handler.removeCallbacks(refresh);if("running".equals(phase)){phase="cancelled";taskState="任务因界面销毁而取消";}remoteCancel.set(null);work.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){alive=false;handler.removeCallbacks(refresh);if(task!=null&&"running".equals(phase)){phase="cancelled";taskState="任务因界面销毁而取消";remoteCancel.set(null);}work.shutdownNow();super.onDestroy();}
 }
