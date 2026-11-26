@@ -53,8 +53,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Compile MCP Java core
-        run: javac -d /tmp/mcp-check engine/app/src/main/java/dev/tavo/engine/McpServer.java
+      - name: Validate Java core and timeline regression
+        run: |
+          javac -d /tmp/mcp-check engine/app/src/main/java/dev/tavo/engine/McpServer.java engine/app/src/main/java/dev/tavo/engine/Timeline.java engine/tests/TimelineTest.java
+          java -cp /tmp/mcp-check dev.tavo.engine.TimelineTest
       - name: Compile debug APK
         run: gradle -p engine :app:assembleDebug --no-daemon --stacktrace
       - name: Verify APK signature
