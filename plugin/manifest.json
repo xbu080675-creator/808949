@@ -1,0 +1,71 @@
+{
+  "specVersion": 2,
+  "id": "com.tavo.multimodal.probe",
+  "name": "Tavo Multimodal",
+  "version": "0.0.1",
+  "author": "Tavo Multimodal",
+  "description": "多模态技术验证：手动检查宿主接口、配置、变量存储及媒体文件读取，不自动发送聊天内容。",
+  "localization": {
+    "defaultLocale": "zh-CN"
+  },
+  "entry": "entry.js",
+  "permissions": [
+    "message",
+    "variable",
+    "file",
+    "network"
+  ],
+  "contributes": {
+    "inputActions": [
+      {
+        "id": "probe",
+        "label": "多模态诊断"
+      },
+      {
+        "id": "media",
+        "label": "测试音视频文件"
+      },
+      {
+        "id": "network",
+        "label": "测试 API 网络"
+      }
+    ],
+    "settings": {
+      "schema": [
+        {
+          "type": "info",
+          "text": "仅手动测试，不自动发送聊天内容或媒体。网络测试不携带密钥。",
+          "icon": "info"
+        },
+        {
+          "key": "endpoint",
+          "type": "text",
+          "label": "HTTPS API 测试地址",
+          "default": ""
+        },
+        {
+          "key": "model",
+          "type": "text",
+          "label": "模型名称",
+          "default": ""
+        },
+        {
+          "key": "protocol",
+          "type": "select",
+          "label": "协议（预留）",
+          "default": "openai",
+          "options": [
+            {
+              "value": "openai",
+              "label": "OpenAI"
+            },
+            {
+              "value": "anthropic",
+              "label": "Anthropic"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
