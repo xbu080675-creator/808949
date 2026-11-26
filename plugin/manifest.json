@@ -2,7 +2,7 @@
   "specVersion": 2,
   "id": "com.tavo.multimodal.probe",
   "name": "Tavo Multimodal",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": "Tavo Multimodal",
   "description": "多模态技术验证：手动检查宿主接口、配置、变量存储及媒体文件读取，不自动发送聊天内容。",
   "localization": {
@@ -28,6 +28,14 @@
       {
         "id": "network",
         "label": "测试 API 网络"
+      },
+      {
+        "id": "native",
+        "label": "测试原生网络下载"
+      },
+      {
+        "id": "report",
+        "label": "导出网络诊断报告"
       }
     ],
     "settings": {
