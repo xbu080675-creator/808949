@@ -19,11 +19,13 @@ jobs:
         run: |
           node --check plugin/entry.js
           node --check plugin/processor.js
+          sed -n '/^<script>$/,/^<\/script>$/p' plugin/video-panel.html | sed '1d;$d' > /tmp/tavo-video-panel.js
+          node --check /tmp/tavo-video-panel.js
           node -e "JSON.parse(require('fs').readFileSync('plugin/manifest.json','utf8'))"
           mkdir -p dist
           cd plugin
-          zip -r ../dist/Tavo-Multimodal-v0.0.16.tpg manifest.json entry.js processor.js
+          zip -r ../dist/Tavo-Multimodal-v0.0.17.tpg manifest.json entry.js processor.js video-panel.html
       - uses: actions/upload-artifact@v4
         with:
-          name: Tavo-Multimodal-v0.0.16
+          name: Tavo-Multimodal-v0.0.17
           path: dist/*.tpg
