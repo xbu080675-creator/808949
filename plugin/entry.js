@@ -27,13 +27,13 @@ tavo.plugin.onInputAction('media',run(async()=>{
  if(!files.length)return;
  const f=files[0];
  try{
- if(f.size>2*1024*1024){await toast('请选择小于 2 MB 的测试文件');return;}
+ if(f.size>20*1024*1024){await toast('请选择不超过 20 MB 的测试文件');return;}
  const data=await tavo.file.load(f.path,{encoding:'base64'});
  await toast('媒体读取：'+(data?'通过':'失败')+'；字节 '+f.size);
  }finally{await tavo.file.delete(f.path);}
 }));
 tavo.plugin.onInputAction('network',run(async()=>{
- const lines=['Tavo Multimodal 0.0.11'];
+ const lines=['Tavo Multimodal 0.0.12'];
  let stage='读取配置';
  try{
  const raw=String(tavo.plugin.config.get('endpoint')||'').trim();
@@ -56,7 +56,7 @@ tavo.plugin.onInputAction('network',run(async()=>{
  await report('network',lines);
 }));
 tavo.plugin.onInputAction('native',run(async()=>{
- const lines=['Tavo Multimodal 0.0.11','原生文件下载：固定公开测试地址，不携带密钥'];
+ const lines=['Tavo Multimodal 0.0.12','原生文件下载：固定公开测试地址，不携带密钥'];
  let path;
  try{
  path=await tavo.file.save('tavo-mm-network-probe-'+Date.now()+'.txt','https://example.com/',{scope:'chat'});
@@ -71,7 +71,7 @@ const promptText='Reply with exactly OK.';
 const modelTest=(id,fn)=>tavo.plugin.onInputAction(id,run(async()=>{
  if(busy){await toast('已有模型测试运行中');return;}
  busy=true;
- const lines=['Tavo Multimodal 0.0.11'];
+ const lines=['Tavo Multimodal 0.0.12'];
  try{await toast('正在测试，可能产生少量 API 费用');await fn(lines);}
  catch(e){lines.push('失败：'+errorText(e));}
  finally{busy=false;}
@@ -168,7 +168,7 @@ tavo.plugin.onInputAction('lastImage',run(async()=>{const p=await tavo.variable.
 
 const diagKey=key+'.mediaDiag';
 const diagnostic=(id,fn)=>tavo.plugin.onInputAction(id,mediaRun(async()=>{
- let stage='开始';const lines=['Tavo Multimodal 0.0.11',id];
+ let stage='开始';const lines=['Tavo Multimodal 0.0.12',id];
  try{await fn(v=>{stage=v;lines.push(v);});lines.push(debugMode()&&id!=='askProbe'?'调试模式：未调用媒体 API':'操作完成');}
  catch(e){lines.push(stage+'：'+errorText(e));}
  await tavo.variable.set(diagKey+'.'+id,lines.join('\n'),'global');await toast(lines[lines.length-1]);
@@ -251,7 +251,7 @@ tavo.plugin.onInputAction('autoReport',run(async()=>{
  await logQueue;
  const rows=await tavo.variable.get(logKey,'global');
  const p=await tavo.variable.get(pauseKey,'chat');
- await tavo.utils.export('tavo-auto-report.txt',['Tavo Multimodal 0.0.11','媒体调试：'+debugMode(),'当前聊天暂停：'+JSON.stringify(p||{}),'已注册：'+registered.join(', '),'日志写入失败次数：'+logErrors,...Array.from(new Set([...(Array.isArray(rows)?rows:[]),...sessionLog]))].join('\n'));
+ await tavo.utils.export('tavo-auto-report.txt',['Tavo Multimodal 0.0.12','媒体调试：'+debugMode(),'当前聊天暂停：'+JSON.stringify(p||{}),'已注册：'+registered.join(', '),'日志写入失败次数：'+logErrors,...Array.from(new Set([...(Array.isArray(rows)?rows:[]),...sessionLog]))].join('\n'));
 }));
 tavo.plugin.onInputAction('resumeAuto',mediaRun(async()=>{
  await tavo.variable.set(pauseKey,{},'chat');await autoLog('手动解除暂停');await toast('已解除自动暂停；调试开关保持不变');
@@ -363,12 +363,12 @@ tavo.plugin.onInputAction('visualEdit',mediaRun(async()=>{
 }));
 tavo.plugin.onInputAction('visualExport',mediaRun(async()=>{const {member}=await currentMember();const v=await tavo.variable.get(profileKey(member.id),'global');await tavo.utils.export('tavo-visual-profile.txt',JSON.stringify({name:member.name,visual:v||''},null,2));}));
 tavo.plugin.onInputAction('visualClear',mediaRun(async()=>{const {c,member}=await currentMember();if(answerValue(await tavo.utils.ask({question:'清空当前角色视觉档案？',options:['清空','取消'],allowOther:false}))!=='清空')return;await active(c.id);await tavo.variable.set(profileKey(member.id),'','global');await toast('视觉档案已清空');}));
-tavo.plugin.onInputAction('frequencyReport',run(async()=>{const f=await tavo.variable.get(freqKey,'chat');await tavo.utils.export('tavo-frequency.txt',JSON.stringify({version:'0.0.11',debug:debugMode(),intervals:{plan:interval('plan'),voice:interval('voice'),image:interval('image')},caps,state:f||{}},null,2));}));
+tavo.plugin.onInputAction('frequencyReport',run(async()=>{const f=await tavo.variable.get(freqKey,'chat');await tavo.utils.export('tavo-frequency.txt',JSON.stringify({version:'0.0.12',debug:debugMode(),intervals:{plan:interval('plan'),voice:interval('voice'),image:interval('image')},caps,state:f||{}},null,2));}));
 const safeImage=p=>typeof p==='string'&&/^files\/chat\/mm-[a-z0-9-]+\.(png|jpg|jpeg|webp)$/i.test(p);
 tavo.plugin.onInputAction('importMediaProbe',mediaRun(async()=>{
  const c=await tavo.chat.current();if(!c)throw new Error('无活动聊天');
  const files=await tavo.file.import({scope:'tmp',extensions:['png','jpg','jpeg','webp','mp3','wav','m4a','mp4','webm','ogg'],multiple:false});if(!files?.length)return;
- const f=files[0];try{if(!Number.isFinite(f.size)||f.size<1||f.size>2*1024*1024)throw new Error('请选择不超过2MB的文件');const data=await tavo.file.load(f.path,{encoding:'base64'});if(!data)throw new Error('读取失败');await toast('本地读取成功 '+f.size+' 字节；未上传、未理解内容');
+ const f=files[0];try{if(!Number.isFinite(f.size)||f.size<1||f.size>20*1024*1024)throw new Error('请选择不超过20MB的文件');const data=await tavo.file.load(f.path,{encoding:'base64'});if(!data)throw new Error('读取失败');await toast('本地读取成功 '+f.size+' 字节；未上传、未理解内容');
  const ext=String(f.name||f.path).split('.').pop().toLowerCase();if(['png','jpg','jpeg','webp'].includes(ext)&&answerValue(await tavo.utils.ask({question:'将此图片保存到当前聊天，以测试聊天内展示？',options:['保存','取消'],allowOther:false}))==='保存'){await active(c.id);const p=await tavo.file.save('mm-import-'+Date.now()+'.'+ext,data,{scope:'chat',encoding:'base64'});if(!safeImage(p))throw new Error('图片路径异常');await tavo.variable.set(key+'.lastImage',p,'chat');await toast('已保存；可点击插入最近图片');}
  }finally{await tavo.file.delete(f.path);}
 }));
