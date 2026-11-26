@@ -18,11 +18,12 @@ jobs:
       - name: Validate and package
         run: |
           node --check plugin/entry.js
+          node --check plugin/processor.js
           node -e "JSON.parse(require('fs').readFileSync('plugin/manifest.json','utf8'))"
           mkdir -p dist
           cd plugin
-          zip -r ../dist/Tavo-Multimodal-v0.0.14.tpg manifest.json entry.js
+          zip -r ../dist/Tavo-Multimodal-v0.0.15.tpg manifest.json entry.js processor.js
       - uses: actions/upload-artifact@v4
         with:
-          name: Tavo-Multimodal-v0.0.14
+          name: Tavo-Multimodal-v0.0.15
           path: dist/*.tpg
