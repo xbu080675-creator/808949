@@ -63,3 +63,6 @@ TPG 保留旧功能，兼容0.1.0/0.2.0，新增 MCP 任务状态、授权取消
 
 ## v0.0.21 / Engine v0.3.0
 TPG 支持0.3.0、MCP百分比/ETA、长报告两分钟片段授权注入，旧功能保留；语法、回归及长报告测试、ZIP及源码哈希通过。Engine 源码新增 service-owned worker、有限 wake lock、通知栏进度/取消/完成提醒、AtomicFile 最近任务检查点和手动恢复；Base/Small独立下载校验；全时间轴最多96采样点、30秒音频窗口、2小时媒体限制、失败段记录。纯Java时间轴测试用345110ms视频得到70点、最后342644ms、12个音频窗口；JDK MCP实际HTTP 12项断言通过（供应者模拟）。Android SDK/NDK不可用，APK、锁屏、MediaCodec长音频、Small及恢复实机均未验证。完整VLM、自动媒体跨应用提交、多任务历史和MCP自动轮询未实现。
+
+## v0.4.0 / v0.0.22
+源码：可选 MediaPipe Gemma 3n .task 图像输入、内置多字符集 OCR、Whisper 语言锁定与28秒重叠窗口、时间戳对齐、持久队列与历史、Android 系统分享入口、heap 统计；TPG 注入诊断/撤销及并发锁。TPG 实际打包与 JS/ZIP 检查、Node hook 模拟及 JDK TimelineTest 通过。Android APK 构建/推理/旧功能回归未验证。VLM 独立实验构建，权重需官方许可后导入，不是 SmolVLM。队列手动启动下一项；Tavo 自动附件转发、完整语义融合尚未实现。
