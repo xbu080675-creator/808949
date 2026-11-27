@@ -30,9 +30,28 @@ public class MainActivity extends Activity {
     static Map<String,Object> cancelRemote(){Map<String,Object> m=status();m.put("cancelRequested",EngineJobs.cancelRemote());return m;}
     public static class EngineService extends Service {
         McpServer server;Handler h=new Handler(Looper.getMainLooper());NotificationManager nm;String notifiedJob="";
+        final ExecutorService imports=Executors.newSingleThreadExecutor();volatile boolean stopped=false,copying=false;
+        void copyShared(Uri uri){
+            if(copying||importingModel){Toast.makeText(this,"已有导入任务",Toast.LENGTH_SHORT).show();return;}
+            copying=true;imports.execute(()->{
+                File folder=new File(getFilesDir(),"shared40");folder.mkdirs();File out=new File(folder,UUID.randomUUID()+".media");
+                boolean submitted=false;
+                try{
+                    if(!"content".equals(uri.getScheme()))throw new java.io.IOException("unsupported URI");
+                    long bytes=0;try(java.io.InputStream in=getContentResolver().openInputStream(uri);java.io.FileOutputStream stream=new java.io.FileOutputStream(out)){
+                        if(in==null)throw new java.io.IOException("unreadable media");byte[] buf=new byte[262144];int n;
+                        while((n=in.read(buf))!=-1){if(stopped||Thread.currentThread().isInterrupted())throw new InterruptedException();bytes+=n;if(bytes>200L*1024*1024)throw new java.io.IOException("share exceeds 200 MiB");stream.write(buf,0,n);}stream.getFD().sync();
+                    }
+                    if(bytes==0||stopped)throw new java.io.IOException("empty or stopped");
+                    EngineJobs.start(Uri.fromFile(out));submitted=true;
+                    h.post(()->Toast.makeText(this,"已接收媒体，开始分析或加入队列",Toast.LENGTH_SHORT).show());
+                }catch(Exception e){h.post(()->Toast.makeText(this,"媒体接收失败："+e.getClass().getSimpleName(),Toast.LENGTH_LONG).show());}
+                finally{if(!submitted)out.delete();copying=false;}
+            });
+        }
         Notification notification(){
             Map<String,Object> j=EngineJobs.snapshot();int p=(int)EngineJobs.number(j,"progressPercent");
-            String stage=EngineJobs.string(j,"taskState");boolean running=EngineJobs.running();Object eta=j.get("etaSeconds");if(running&&eta!=null)stage+=" · 估计剩余 "+eta+" 秒";
+            String stage=EngineJobs.string(j,"taskState");boolean running=EngineJobs.running();if(copying)stage="正在接收共享媒体 · "+stage;Object eta=j.get("etaSeconds");if(running&&eta!=null)stage+=" · 估计剩余 "+eta+" 秒";
             PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class).putExtra("tasks",true),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
             Notification.Builder b=new Notification.Builder(this,"engine").setContentTitle("Multimodal Engine · "+(running?p+"%":"本机 MCP")).setContentText(stage).setSmallIcon(android.R.drawable.ic_menu_share).setContentIntent(open).setOnlyAlertOnce(true).setOngoing(running).setVisibility(Notification.VISIBILITY_PRIVATE);
             if(running){b.setProgress(100,p,EngineJobs.number(j,"totalUnits")==0);PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,EngineService.class).setAction("cancel"),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);b.addAction(new Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel,"取消分析",stop).build());}
@@ -45,12 +64,12 @@ public class MainActivity extends Activity {
         }
         @Override public int onStartCommand(Intent i,int flags,int id){
             if(server==null)return START_NOT_STICKY;
-            if(i!=null)try{String a=i.getAction();if("analyze".equals(a)&&i.getData()!=null)EngineJobs.start(i.getData());else if("resume".equals(a))EngineJobs.resume();else if("next".equals(a))EngineJobs.next();else if("cancel".equals(a))EngineJobs.requestCancel();}
+            if(i!=null)try{String a=i.getAction();if("share".equals(a)&&i.getData()!=null)copyShared(i.getData());else if("analyze".equals(a)&&i.getData()!=null)EngineJobs.start(i.getData());else if("resume".equals(a))EngineJobs.resume();else if("next".equals(a))EngineJobs.next();else if("cancel".equals(a))EngineJobs.requestCancel();}
             catch(Exception e){Toast.makeText(this,"任务未启动："+e.getMessage(),Toast.LENGTH_LONG).show();}
             nm.notify(1,notification());return START_NOT_STICKY;
         }
         @Override public IBinder onBind(Intent i){return null;}
-        @Override public void onDestroy(){h.removeCallbacks(refresh);EngineJobs.requestCancel();EngineJobs.revoke();if(server!=null){try{server.close();}catch(Exception ignored){}serviceState="已停止";}super.onDestroy();}
+        @Override public void onDestroy(){stopped=true;imports.shutdownNow();h.removeCallbacks(refresh);EngineJobs.requestCancel();EngineJobs.revoke();if(server!=null){try{server.close();}catch(Exception ignored){}serviceState="已停止";}super.onDestroy();}
     }
     final Handler handler=new Handler(Looper.getMainLooper());
     String displayedJob="";static volatile boolean importingModel=false;String importChoice="e2b";
@@ -109,7 +128,7 @@ public class MainActivity extends Activity {
     void showHistory(){
         List<String> ids=EngineJobs.historyIds();if(ids.isEmpty()){tell("暂无历史报告（开始新任务时归档已完成任务）");return;}
         new AlertDialog.Builder(this).setTitle("历史报告 · 选择查看").setItems(ids.toArray(new String[0]),(d,i)->{String id=ids.get(i);try{
-            String t=McpServer.json(EngineJobs.history(id));new AlertDialog.Builder(this).setTitle("历史报告").setMessage(t.length()>10000?t.substring(0,10000)+"\\n…":t).setNegativeButton("返回",null).setPositiveButton("授权 MCP 读取",(a,b)->{try{EngineJobs.shareHistory(id);tell("已授权历史报告");}catch(Exception e){tell("历史读取失败");}}).show();
+            String t=McpServer.json(EngineJobs.history(id));new AlertDialog.Builder(this).setTitle("历史报告").setMessage(t.length()>10000?t.substring(0,10000)+"\n…":t).setNegativeButton("返回",null).setPositiveButton("授权 MCP 读取",(a,b)->{try{EngineJobs.shareHistory(id);tell("已授权历史报告");}catch(Exception e){tell("历史读取失败");}}).show();
         }catch(Exception e){tell("历史读取失败");}}).show();
     }
     void cancelTask(){EngineJobs.requestCancel();renderCompleted();}
@@ -135,7 +154,7 @@ public class MainActivity extends Activity {
         root=pages[2];c=card("后台媒体任务");taskView=label(c,"暂无任务",15,Color.WHITE);
         progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);c.addView(progress,new LinearLayout.LayoutParams(-1,dp(12)));progressLabel=label(c,"0%",14,0xffb7adff);
         button(c,"选择视频 / 音频（运行中加入队列）",()->{if(importingModel){tell("模型导入中");return;}selectMedia();});
-        button(c,"查看排队任务",()->{List<String> q=EngineJobs.queueLabels();new AlertDialog.Builder(this).setTitle("排队 "+q.size()+" 项").setMessage(q.isEmpty()?"暂无排队":String.join("\\n",q)).setNegativeButton("返回",null).setPositiveButton("清空队列",(d,w)->{try{EngineJobs.clearQueue();tell("队列已清空");}catch(Exception e){tell("清空失败");}}).show();});
+        button(c,"查看排队任务",()->{List<String> q=EngineJobs.queueLabels();new AlertDialog.Builder(this).setTitle("排队 "+q.size()+" 项").setMessage(q.isEmpty()?"暂无排队":String.join("\n",q)).setNegativeButton("返回",null).setPositiveButton("清空队列",(d,w)->{try{EngineJobs.clearQueue();tell("队列已清空");}catch(Exception e){tell("清空失败");}}).show();});
         button(c,"启动下一排队任务",()->{if(importingModel){tell("模型导入中");return;}startForegroundService(new Intent(this,EngineService.class).setAction("next"));});
         button(c,"历史报告",this::showHistory);
         button(c,"清除历史报告",()->new AlertDialog.Builder(this).setTitle("删除所有归档报告？").setNegativeButton("返回",null).setPositiveButton("删除",(d,w)->{EngineJobs.clearHistory();tell("历史已清除");}).show());
@@ -147,7 +166,16 @@ public class MainActivity extends Activity {
         button(c,"清除本机任务和检查点",()->new AlertDialog.Builder(this).setTitle("清除最近任务？").setMessage("清除分析文字、预览和恢复记录，不删除原视频。").setNegativeButton("返回",null).setPositiveButton("清除",(d,w)->{try{EngineJobs.clear();renderCompleted();}catch(Exception e){tell(e.getMessage());}}).show());
         preview=new ImageView(this);preview.setAdjustViewBounds(true);preview.setScaleType(ImageView.ScaleType.FIT_CENTER);c.addView(preview,new LinearLayout.LayoutParams(-1,dp(220)));detail=label(c,"暂无结果",13,0xffaab1c4);detail.setTextIsSelectable(true);
         root=pages[3];c=card("隐私与说明");label(c,"服务仅监听 127.0.0.1，需要随机令牌。原始媒体和图片留在本机；授权分享后，Tavo 可将分析文字交给聊天模型。任务由前台服务执行，可切换应用及尝试锁屏运行。系统强制终止后需手动恢复。最近任务检查点保存在私有目录，最长2小时媒体；Whisper 新任务采用28秒主窗口与重叠上下文；历史仅保存12份归档，队列最多8项，取消在分段边界生效。",14,0xffaab1c4);button(c,"复制配对令牌",this::copyToken);button(c,"撤销媒体共享及远程取消",()->{EngineJobs.revoke();tell("已撤销");});
-        LinearLayout nav=new LinearLayout(this);nav.setOrientation(0);String[] titles={"首页","模型","任务","设置"};for(int i=0;i<4;i++){final int n=i;tabs[i]=makeButton(titles[i],()->page(n));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(2),dp(6),dp(2),0);nav.addView(tabs[i],lp);}shell.addView(nav);page(getIntent().getBooleanExtra("tasks",false)?2:0);renderCompleted();handler.post(refresh);
+        LinearLayout nav=new LinearLayout(this);nav.setOrientation(0);String[] titles={"首页","模型","任务","设置"};for(int i=0;i<4;i++){final int n=i;tabs[i]=makeButton(titles[i],()->page(n));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(2),dp(6),dp(2),0);nav.addView(tabs[i],lp);}shell.addView(nav);page(getIntent().getBooleanExtra("tasks",false)?2:0);renderCompleted();handler.post(refresh);if(b==null)handleShare(getIntent());
+    }
+    @Override protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);handleShare(i);}
+    void handleShare(Intent i){
+        if(i==null||!Intent.ACTION_SEND.equals(i.getAction()))return;
+        String type=i.getType();Uri uri=i.getParcelableExtra(Intent.EXTRA_STREAM);
+        if(uri==null||!"content".equals(uri.getScheme())||type==null||!(type.startsWith("audio/")||type.startsWith("video/"))){tell("不支持的共享文件");return;}
+        new AlertDialog.Builder(this).setTitle("接收共享媒体？").setMessage("复制到本机私有目录（最多200 MiB），开始分析或加入队列。不会上传原始媒体。").setNegativeButton("返回",null).setPositiveButton("接收",(d,w)->{
+            try{Intent service=new Intent(this,EngineService.class).setAction("share").setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);service.setClipData(ClipData.newRawUri("media",uri));startForegroundService(service);page(2);}catch(Exception e){tell("共享失败，请使用系统文件选择器");}
+        }).show();
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;if(request==41){importVision(data.getData(),importChoice);return;}if(request!=21)return;
