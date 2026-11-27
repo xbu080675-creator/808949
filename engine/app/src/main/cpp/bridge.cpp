@@ -23,6 +23,7 @@ Java_dev_tavo_engine_WhisperBridge_infer(JNIEnv *env,jclass,jstring path,jfloatA
         if(env->CallBooleanMethod(worker,interrupted)||env->ExceptionCheck())return nullptr;
         int len=std::min((int)(n-off),30*16000);env->GetFloatArrayRegion(audio,off,len,chunk.data());if(env->ExceptionCheck())return nullptr;
         if(whisper_full(ctx.get(),wp,chunk.data(),len)!=0)return nullptr;
+        if(off==0){const char *detected=whisper_lang_str(whisper_full_lang_id(ctx.get()));if(detected)text+="@lang="+std::string(detected)+"\n";}
         for(int i=0;i<whisper_full_n_segments(ctx.get());i++){
             auto t=off/16000+whisper_full_get_segment_t0(ctx.get(),i)/100.0;
             text+="["+std::to_string(t)+"s] ";text+=whisper_full_get_segment_text(ctx.get(),i);text+="\n";
