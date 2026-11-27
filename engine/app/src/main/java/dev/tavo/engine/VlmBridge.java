@@ -10,9 +10,9 @@ final class VlmBridge implements AutoCloseable {
     private Class<?> engine,session,mpImage;
     static boolean available(){try{Class.forName(P+"LlmInference",false,VlmBridge.class.getClassLoader());return true;}catch(Exception|LinkageError e){return false;}}
     static File model(Context c,String choice){if(!"e2b".equals(choice)&&!"e4b".equals(choice))throw new IllegalArgumentException("unknown model");return new File(c.getFilesDir(),"vision-"+choice+".task");}
-    private static Object call(Object o,String name,Class<?>[] types,Object... args)throws Exception{return o.getClass().getMethod(name,types).invoke(o,args);}
+    private static Object call(Object o,String name,Class<?>[] types,Object... args)throws Exception{Method m=o.getClass().getMethod(name,types);m.setAccessible(true);return m.invoke(o,args);}
     private static Object builder(Class<?> cls)throws Exception{return cls.getMethod("builder").invoke(null);}
-    private static Object build(Object b)throws Exception{return b.getClass().getMethod("build").invoke(b);}
+    private static Object build(Object b)throws Exception{return call(b,"build",new Class[0]);}
     private static Class<?> cls(String n)throws Exception{return Class.forName(P+n);}
     VlmBridge(Context c,String choice)throws Exception{
         File f=model(c,choice);if(!f.isFile()||f.length()<100000000L)throw new IllegalStateException("vision model not imported");
