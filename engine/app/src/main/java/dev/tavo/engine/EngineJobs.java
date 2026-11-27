@@ -52,7 +52,7 @@ final class EngineJobs {
     }
     private static void releaseIfUnused(String uri){
         if(uri.isEmpty()||uri.equals(job.get("uri"))||queue.stream().anyMatch(x->uri.equals(x.get("uri"))))return;
-        try{app.getContentResolver().releasePersistableUriPermission(Uri.parse(uri),Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        try{Uri source=Uri.parse(uri);if("file".equals(source.getScheme())){File file=new File(source.getPath()).getCanonicalFile(),root=new File(app.getFilesDir(),"shared40").getCanonicalFile();if(root.equals(file.getParentFile())&&file.getName().matches("[a-f0-9-]{36}\\.media"))file.delete();}else app.getContentResolver().releasePersistableUriPermission(source,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
     }
     private static void archive()throws IOException{
         if(!"done".equals(job.get("phase")))return;
@@ -76,7 +76,7 @@ final class EngineJobs {
     static synchronized void next()throws Exception{
         if(active||queue.isEmpty())throw new IllegalStateException("没有可启动的排队任务");
         if(job.get("uri")!=null&&!"done".equals(job.get("phase")))throw new IllegalStateException("请先继续或清除当前任务");
-        Map<String,Object> item=queue.get(0);replaceJob(item);queue.remove(0);saveQueue();launch();
+        Map<String,Object> item=queue.get(0);replaceJob(item);queue.remove(0);try{saveQueue();}catch(IOException e){/* Current checkpoint already owns the job; deduplicate on restart. */}launch();
     }
     private static void replaceJob(Map<String,Object> next)throws Exception{
         archive();String old=string(job,"uri");Map<String,Object> prior=job;job=next;
