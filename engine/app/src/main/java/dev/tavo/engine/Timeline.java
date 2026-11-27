@@ -11,6 +11,14 @@ final class Timeline {
     static long sample(long ms,int i,int count){return (long)((i+.5)*ms/count);}
     static long progress(long done,long total){return total>0?Math.max(0,Math.min(100,100*done/total)):0;}
     static Long eta(long done,long total,long sessionDone,long spent){long current=done-sessionDone;return current>=2&&total>done&&spent>0?Math.min(86400L,(spent/current*(total-done)+999)/1000):null;}
+    static String ownedTranscript(String text,long decodeFrom,long from,long to){
+        StringBuilder out=new StringBuilder();Pattern pattern=Pattern.compile("^\\[(\\d+(?:\\.\\d+)?)s\\](.*)$");
+        for(String line:text.split("\\n")){Matcher a=pattern.matcher(line);if(a.matches()){
+            double absoluteMs=decodeFrom+1000*Double.parseDouble(a.group(1));
+            if(absoluteMs>=from&&absoluteMs<to)out.append('[').append(String.format(Locale.ROOT,"%.3f",absoluteMs/1000)).append("s]").append(a.group(2)).append('\n');
+        }}
+        return out.toString();
+    }
     static String offsetTranscript(String text,long startMs){
         StringBuilder out=new StringBuilder();Pattern pattern=Pattern.compile("^\\[(\\d+(?:\\.\\d+)?)s\\](.*)$");
         for(String line:text.split("\\n")){Matcher a=pattern.matcher(line);if(a.matches())out.append('[').append(String.format(Locale.ROOT,"%.3f",startMs/1000.0+Double.parseDouble(a.group(1)))).append("s]").append(a.group(2)).append('\n');}
