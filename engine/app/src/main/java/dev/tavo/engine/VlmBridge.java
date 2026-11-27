@@ -26,9 +26,11 @@ final class VlmBridge implements AutoCloseable {
     }
     String describe(Bitmap bitmap)throws Exception{
         Class<?> opts=cls("LlmInferenceSession$LlmInferenceSessionOptions");
-        Class<?> graph=cls("GraphOptions");
+        Object b=builder(opts);
+        Class<?> graph=null;for(Method m:b.getClass().getMethods())if(m.getName().equals("setGraphOptions")&&m.getParameterCount()==1){graph=m.getParameterTypes()[0];break;}
+        if(graph==null)throw new NoSuchMethodException("setGraphOptions");
         Object g=builder(graph);call(g,"setEnableVisionModality",new Class[]{boolean.class},true);
-        Object b=builder(opts);call(b,"setGraphOptions",new Class[]{graph},build(g));
+        call(b,"setGraphOptions",new Class[]{graph},build(g));
         call(b,"setTopK",new Class[]{int.class},10);call(b,"setTemperature",new Class[]{float.class},0.2f);
         Object s=session.getMethod("createFromOptions",engine,opts).invoke(null,llm,build(b));
         Object image=null;
